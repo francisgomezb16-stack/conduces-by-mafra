@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidConduce(data) {
+      return data.userId == request.auth.uid &&
+             data.conduceNumber is string && data.conduceNumber.size() >= 1 && data.conduceNumber.size() <= 60 &&
+             data.type is string && data.type.size() <= 30 &&
+             data.status is string && data.status.size() <= 30 &&
+             data.originProject is string && data.originProject.size() <= 200 &&
+             data.destinationProject is string && data.destinationProject.size() <= 200 &&
+             (!('originResponsible' in data) || (data.originResponsible is string && data.originResponsible.size() <= 100)) &&
+             (!('destinationResponsible' in data) || (data.destinationResponsible is string && data.destinationResponsible.size() <= 100)) &&
+             (!('carrierName' in data) || (data.carrierName is string && data.carrierName.size() <= 100)) &&
+             (!('carrierIdNumber' in data) || (data.carrierIdNumber is string && data.carrierIdNumber.size() <= 50)) &&
+             (!('carrierPhone' in data) || (data.carrierPhone is string && data.carrierPhone.size() <= 50)) &&
+             (!('vehiclePlate' in data) || (data.vehiclePlate is string && data.vehiclePlate.size() <= 40)) &&
+             (!('vehicleDescription' in data) || (data.vehicleDescription is string && data.vehicleDescription.size() <= 150)) &&
+             (!('items' in data) || (data.items is list && data.items.size() <= 200)) &&
+             (!('dispatcherName' in data) || (data.dispatcherName is string && data.dispatcherName.size() <= 100)) &&
+             (!('dispatcherSignature' in data) || (data.dispatcherSignature is string && data.dispatcherSignature.size() <= 300000)) &&
+             (!('carrierSignature' in data) || (data.carrierSignature is string && data.carrierSignature.size() <= 300000)) &&
+             (!('receiverName' in data) || (data.receiverName is string && data.receiverName.size() <= 100)) &&
+             (!('receiverSignature' in data) || (data.receiverSignature is string && data.receiverSignature.size() <= 300000)) &&
+             (!('receiverNotes' in data) || (data.receiverNotes is string && data.receiverNotes.size() <= 500)) &&
+             (!('evidenceCount' in data) || (data.evidenceCount is number)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidCompanyProfile(data) {
+      return data.userId == request.auth.uid &&
+             data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 150 &&
+             (!('taxId' in data) || (data.taxId is string && data.taxId.size() <= 50)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 250)) &&
+             (!('logoBase64' in data) || (data.logoBase64 is string && data.logoBase64.size() <= 300000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    match /users/{userId} {
+      match /conduces/{conduceId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(conduceId) &&
+                         incoming().userId == userId &&
+                         isValidConduce(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(conduceId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidConduce(incoming());
+
+        allow delete: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(conduceId);
+      }
+
+      match /settings/{settingId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(settingId) &&
+                         incoming().userId == userId &&
+                         isValidCompanyProfile(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(settingId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidCompanyProfile(incoming());
+
+        allow delete: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(settingId);
+      }
+    }
+  }
+}

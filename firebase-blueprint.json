@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "Conduce": {
+      "title": "Conduce",
+      "description": "Documento de conduce de entrega y traslado de materiales y herramientas entre proyectos u obras",
+      "type": "object",
+      "properties": {
+        "conduceNumber": {
+          "type": "string",
+          "description": "Número o folio único del conduce (ej. CND-2026-0001)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Tipo de conduce: Entrega, Traslado, Devolución"
+        },
+        "status": {
+          "type": "string",
+          "description": "Estado del conduce: Borrador, En Tránsito, Entregado, Anulado"
+        },
+        "originProject": {
+          "type": "string",
+          "description": "Proyecto u obra de origen de los materiales/herramientas"
+        },
+        "originResponsible": {
+          "type": "string",
+          "description": "Persona responsable en origen"
+        },
+        "destinationProject": {
+          "type": "string",
+          "description": "Proyecto u obra de destino"
+        },
+        "destinationResponsible": {
+          "type": "string",
+          "description": "Persona responsable en destino"
+        },
+        "carrierName": {
+          "type": "string",
+          "description": "Nombre del transportista o chofer"
+        },
+        "carrierIdNumber": {
+          "type": "string",
+          "description": "Documento de identidad o licencia del chofer"
+        },
+        "carrierPhone": {
+          "type": "string",
+          "description": "Teléfono de contacto del transportista"
+        },
+        "vehiclePlate": {
+          "type": "string",
+          "description": "Placa del vehículo"
+        },
+        "vehicleDescription": {
+          "type": "string",
+          "description": "Descripción del vehículo (marca, modelo, tipo)"
+        },
+        "items": {
+          "type": "array",
+          "description": "Lista de materiales y herramientas trasladados"
+        },
+        "dispatcherName": {
+          "type": "string",
+          "description": "Nombre de quien despacha"
+        },
+        "dispatcherSignature": {
+          "type": "string",
+          "description": "Firma digital de quien entrega o despacha"
+        },
+        "carrierSignature": {
+          "type": "string",
+          "description": "Firma digital del transportista"
+        },
+        "receiverName": {
+          "type": "string",
+          "description": "Nombre de quien recibe en obra de destino"
+        },
+        "receiverSignature": {
+          "type": "string",
+          "description": "Firma digital de quien recibe"
+        },
+        "receiverNotes": {
+          "type": "string",
+          "description": "Observaciones de quien recibe al momento de la entrega"
+        },
+        "evidenceCount": {
+          "type": "number",
+          "description": "Cantidad de evidencias fotográficas capturadas"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notas generales o condiciones del traslado"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID del usuario propietario del registro"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha y hora de creación del registro. Clients submit FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha y hora de última actualización. Clients submit FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "conduceNumber",
+        "type",
+        "status",
+        "originProject",
+        "destinationProject",
+        "userId",
+        "createdAt"
+      ]
+    },
+    "CompanyProfile": {
+      "title": "CompanyProfile",
+      "description": "Perfil y membrete de la empresa constructora para el comprobante PDF",
+      "type": "object",
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "description": "Razón social o nombre comercial de la empresa"
+        },
+        "taxId": {
+          "type": "string",
+          "description": "RNC, NIT, RFC o Identificación fiscal"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Teléfono de la empresa"
+        },
+        "email": {
+          "type": "string",
+          "description": "Correo electrónico de contacto"
+        },
+        "address": {
+          "type": "string",
+          "description": "Dirección de oficinas centrales o almacén principal"
+        },
+        "logoBase64": {
+          "type": "string",
+          "description": "Logo de la empresa en base64 para el PDF"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID del usuario propietario"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de registro. Clients submit FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de actualización. Clients submit FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "companyName",
+        "userId",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/conduces/{conduceId}": {
+      "schema": "Conduce",
+      "description": "Colección de conduces de traslado y entrega gestionados por cada usuario"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "CompanyProfile",
+      "description": "Configuraciones y datos de la empresa del usuario para membretes y PDFs"
+    }
+  }
+}

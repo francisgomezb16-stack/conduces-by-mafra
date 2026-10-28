@@ -1,0 +1,6 @@
+{
+  "name": "Conduces de Obra",
+  "description": "Gestión de conduces de entrega y traslado de materiales y herramientas entre obras con firmas, evidencias y PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
