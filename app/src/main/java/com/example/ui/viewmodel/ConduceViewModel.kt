@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.CompanyProfile
 import com.example.data.model.Conduce
+import com.example.data.model.DeletionAuditLog
+import com.example.data.model.Project
+import com.example.data.model.UserProfile
 import com.example.data.repository.ConduceRepository
 import com.example.util.PdfGenerator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +50,24 @@ class ConduceViewModel(
             initialValue = CompanyProfile()
         )
 
-    val projectsState: StateFlow<List<com.example.data.model.Project>> = repository.observeProjects()
+    val projectsState: StateFlow<List<Project>> = repository.observeProjects()
+        .catch { emit(emptyList()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = emptyList()
+        )
+
+    val userProfileState: StateFlow<UserProfile> = repository.observeUserProfile()
+        .map { it ?: UserProfile(role = "Administrador", securityLevel = 1) }
+        .catch { emit(UserProfile(role = "Administrador", securityLevel = 1)) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UserProfile(role = "Administrador", securityLevel = 1)
+        )
+
+    val deletionLogsState: StateFlow<List<DeletionAuditLog>> = repository.observeDeletionLogs()
         .catch { emit(emptyList()) }
         .stateIn(
             scope = viewModelScope,
@@ -101,14 +121,45 @@ class ConduceViewModel(
         }
     }
 
-    fun deleteConduce(conduceId: String, onDone: () -> Unit = {}) {
+    fun deleteConduceWithAudit(
+        context: Context,
+        conduce: Conduce,
+        reason: String,
+        onDone: () -> Unit = {}
+    ) {
         viewModelScope.launch {
-            val result = repository.deleteConduce(conduceId)
+            val userProfile = userProfileState.value
+            // 1. Physically delete any cached PDF file for this conduce
+            try {
+                val pdfDir = File(context.cacheDir, "pdfs")
+                if (pdfDir.exists()) {
+                    pdfDir.listFiles()?.filter {
+                        it.name.contains(conduce.conduceNumber) || it.name.contains(conduce.id)
+                    }?.forEach { it.delete() }
+                }
+            } catch (e: Exception) {
+                // non-fatal, continue with audit trail
+            }
+
+            // 2. Persist audit log and delete document
+            val result = repository.deleteConduceWithAudit(conduce, userProfile, reason)
             result.onSuccess {
-                _userMessage.value = "Conduce eliminado."
+                _userMessage.value = "Conduce ${conduce.conduceNumber} y su PDF fueron eliminados. Evidencia registrada."
                 onDone()
             }.onFailure { e ->
                 _userMessage.value = "Error al eliminar: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun saveUserProfile(profile: UserProfile, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.saveUserProfile(profile)
+            result.onSuccess {
+                _userMessage.value = "Perfil de usuario actualizado (${profile.role})."
+                onDone()
+            }.onFailure { e ->
+                _userMessage.value = "Error al guardar perfil: ${e.localizedMessage}"
             }
         }
     }
@@ -123,6 +174,7 @@ class ConduceViewModel(
             }
         }
     }
+
 
     fun saveProject(project: com.example.data.model.Project, onDone: () -> Unit = {}) {
         viewModelScope.launch {
@@ -154,8 +206,9 @@ class ConduceViewModel(
         evidenceBitmaps: List<Bitmap> = emptyList()
     ): File? {
         val company = companyProfileState.value ?: CompanyProfile()
+        val projects = projectsState.value
         return try {
-            val pdfFile = PdfGenerator.generateConducePdf(context, conduce, company, evidenceBitmaps)
+            val pdfFile = PdfGenerator.generateConducePdf(context, conduce, company, evidenceBitmaps, projects)
             PdfGenerator.sharePdf(context, pdfFile)
             pdfFile
         } catch (e: Exception) {
@@ -170,8 +223,9 @@ class ConduceViewModel(
         evidenceBitmaps: List<Bitmap> = emptyList()
     ): File? {
         val company = companyProfileState.value ?: CompanyProfile()
+        val projects = projectsState.value
         return try {
-            val pdfFile = PdfGenerator.generateConducePdf(context, conduce, company, evidenceBitmaps)
+            val pdfFile = PdfGenerator.generateConducePdf(context, conduce, company, evidenceBitmaps, projects)
             PdfGenerator.viewPdf(context, pdfFile)
             pdfFile
         } catch (e: Exception) {
@@ -180,3 +234,4 @@ class ConduceViewModel(
         }
     }
 }
+

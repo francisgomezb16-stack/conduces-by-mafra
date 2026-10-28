@@ -55,6 +55,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,6 +80,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.Conduce
 import com.example.ui.components.SignatureDialog
 import com.example.ui.viewmodel.ConduceViewModel
@@ -96,10 +99,12 @@ fun ConduceDetailScreen(
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
+    val userProfile by viewModel.userProfileState.collectAsStateWithLifecycle()
 
     var currentConduce by remember { mutableStateOf(conduce) }
     var activeSignatureType by remember { mutableStateOf<String?>(null) } // "dispatcher", "carrier", "receiver"
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var deletionReason by remember { mutableStateOf("") }
     var showStatusMenu by remember { mutableStateOf(false) }
 
     val evidenceBitmaps = remember { mutableStateListOf<Bitmap>() }
@@ -151,28 +156,141 @@ fun ConduceDetailScreen(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Eliminar Conduce") },
-            text = { Text("¿Estás seguro de que deseas eliminar el conduce ${currentConduce.conduceNumber}? Esta acción no se puede deshacer.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteConduce(currentConduce.id, onDone = onBack)
-                        showDeleteConfirm = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) {
-                    Text("Eliminar")
+        val isAdmin = userProfile.role == "Administrador" || userProfile.securityLevel == 1
+
+        if (!isAdmin) {
+            // Usuario Normal cannot delete conduces or destroy PDFs
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = {
+                    Text(
+                        text = "Acceso Restringido",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.Black)
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Tu perfil actual es 'Usuario Normal'. La eliminación de conduces y destrucción de archivos PDF requiere nivel de seguridad 'Administrador'.",
+                            style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Para eliminar este folio o anular el traslado, solicita la autorización del Administrador.",
+                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF4B5563))
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { showDeleteConfirm = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A))
+                    ) {
+                        Text("Entendido", color = Color.White)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancelar")
+            )
+        } else {
+            // Administrator Deletion with mandatory audit justification
+            AlertDialog(
+                onDismissRequest = {
+                    showDeleteConfirm = false
+                    deletionReason = ""
+                },
+                title = {
+                    Text(
+                        text = "Eliminar Conduce y Destruir PDF",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFDC2626)
+                        )
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "¿Deseas eliminar permanentemente el conduce ${currentConduce.conduceNumber} y destruir sus archivos PDF?",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Black
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFFEF2F2))
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = "⚠️ AUDITORÍA DE SEGURIDAD: Esta acción se registrará en la bitácora inmutable a nombre de ${userProfile.displayName.ifBlank { userProfile.username }} (Administrador).",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color(0xFF991B1B),
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = deletionReason,
+                            onValueChange = { deletionReason = it },
+                            label = { Text("Motivo obligatorio de la eliminación *", color = Color.Black) },
+                            placeholder = { Text("Ej: Error en obra de destino, duplicado, etc.", color = Color(0xFF6B7280)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedBorderColor = Color(0xFFDC2626),
+                                unfocusedBorderColor = Color(0xFFD1D5DB)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("delete_reason_input")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (deletionReason.trim().isNotBlank()) {
+                                viewModel.deleteConduceWithAudit(
+                                    context = context,
+                                    conduce = currentConduce,
+                                    reason = deletionReason.trim(),
+                                    onDone = onBack
+                                )
+                                showDeleteConfirm = false
+                                deletionReason = ""
+                            }
+                        },
+                        enabled = deletionReason.trim().isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFDC2626),
+                            disabledContainerColor = Color(0xFFFCA5A5)
+                        ),
+                        modifier = Modifier.testTag("confirm_delete_audit_button")
+                    ) {
+                        Text("Confirmar y Destruir PDF", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirm = false
+                            deletionReason = ""
+                        }
+                    ) {
+                        Text("Cancelar", color = Color.Black)
+                    }
                 }
-            }
-        )
+            )
+        }
     }
+
 
     Scaffold(
         topBar = {

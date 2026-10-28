@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.HistoryEdu
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -71,7 +73,9 @@ import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.CompanyProfile
 import com.example.data.model.Conduce
+import com.example.ui.components.AuditLogsDialog
 import com.example.ui.components.CompanySettingsDialog
+import com.example.ui.components.UserProfileDialog
 import com.example.ui.viewmodel.ConduceViewModel
 import com.example.ui.viewmodel.ConducesUiState
 import java.text.SimpleDateFormat
@@ -93,11 +97,15 @@ fun ConduceListScreen(
     val conducesUiState by viewModel.conducesState.collectAsStateWithLifecycle()
     val companyProfile by viewModel.companyProfileState.collectAsStateWithLifecycle()
     val projects by viewModel.projectsState.collectAsStateWithLifecycle()
+    val userProfile by viewModel.userProfileState.collectAsStateWithLifecycle()
+    val deletionLogs by viewModel.deletionLogsState.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Todos") }
     var showCompanyDialog by remember { mutableStateOf(false) }
+    var showAuditDialog by remember { mutableStateOf(false) }
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(userMessage) {
         userMessage?.let {
@@ -123,6 +131,23 @@ fun ConduceListScreen(
         )
     }
 
+    if (showAuditDialog) {
+        AuditLogsDialog(
+            logs = deletionLogs,
+            onDismiss = { showAuditDialog = false }
+        )
+    }
+
+    if (showProfileDialog) {
+        UserProfileDialog(
+            userProfile = userProfile,
+            onDismiss = { showProfileDialog = false },
+            onUpdateProfile = { updated ->
+                viewModel.saveUserProfile(updated)
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -144,9 +169,30 @@ fun ConduceListScreen(
                                     color = Color.White
                                 )
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Clickable Role Badge (Admin / Usuario)
+                            val isAdmin = userProfile.role == "Administrador" || userProfile.securityLevel == 1
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isAdmin) Color(0xFFF59E0B) else Color(0xFF334155))
+                                    .clickable { showProfileDialog = true }
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    .testTag("user_role_badge")
+                            ) {
+                                Text(
+                                    text = if (isAdmin) "👑 Admin" else "👤 Usuario",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if (isAdmin) Color(0xFF0F172A) else Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                )
+                            }
                         }
                         Text(
-                            text = companyProfile?.companyName?.take(28) ?: "Empresa Constructora",
+                            text = "${companyProfile?.companyName?.take(20) ?: "Pedralbes"} • ${userProfile.displayName.ifBlank { userProfile.username.ifBlank { "Usuario" } }}",
                             style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8)),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -154,16 +200,42 @@ fun ConduceListScreen(
                     }
                 },
                 actions = {
+                    // Audit Logs of deleted conduces and PDFs
+                    IconButton(
+                        onClick = { showAuditDialog = true },
+                        modifier = Modifier.testTag("audit_logs_button")
+                    ) {
+                        Box {
+                            Icon(
+                                imageVector = Icons.Default.HistoryEdu,
+                                contentDescription = "Bitácora de Auditoría",
+                                tint = if (deletionLogs.isNotEmpty()) Color(0xFFEF4444) else Color(0xFF94A3B8)
+                            )
+                            if (deletionLogs.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444))
+                                        .align(Alignment.TopEnd)
+                                )
+                            }
+                        }
+                    }
+
+                    // Company & Project settings
                     IconButton(
                         onClick = { showCompanyDialog = true },
                         modifier = Modifier.testTag("company_settings_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Business,
-                            contentDescription = "Configurar Empresa",
+                            contentDescription = "Configurar Empresa y Proyectos",
                             tint = Color.White
                         )
                     }
+
+                    // Sign Out
                     IconButton(
                         onClick = {
                             signOutUser(context, credentialManager, onSignOut, coroutineScope)
@@ -172,17 +244,16 @@ fun ConduceListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Cerrar sesión",
-                            tint = Color(0xFFCBD5E1)
+                            contentDescription = "Cerrar Sesión",
+                            tint = Color(0xFFEF4444)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0F172A)
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
             )
         },
         floatingActionButton = {
+
             FloatingActionButton(
                 onClick = onNavigateToCreate,
                 containerColor = Color(0xFFF59E0B),

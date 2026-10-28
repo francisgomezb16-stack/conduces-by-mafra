@@ -4,7 +4,9 @@ import android.content.Context
 import com.example.R
 import com.example.data.model.CompanyProfile
 import com.example.data.model.Conduce
+import com.example.data.model.DeletionAuditLog
 import com.example.data.model.Project
+import com.example.data.model.UserProfile
 import com.example.data.util.OperationType
 import com.example.data.util.handleFirestoreError
 import com.google.firebase.Firebase
@@ -32,7 +34,7 @@ class ConduceRepository(
 
     private fun requireUserId(): String {
         return auth.currentUser?.uid
-            ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
+            ?: throw IllegalStateException("User must be signed in before accessing Firestore.")
     }
 
     private fun conducesRef(userId: String) =
@@ -43,6 +45,12 @@ class ConduceRepository(
 
     private fun projectsRef(userId: String) =
         db.collection("users").document(userId).collection("projects")
+
+    private fun deletionLogsRef(userId: String) =
+        db.collection("users").document(userId).collection("deletion_logs")
+
+    private fun profileRef(userId: String) =
+        db.collection("users").document(userId).collection("profile")
 
     fun observeConduces(): Flow<List<Conduce>> = callbackFlow {
         val uid = requireUserId()
@@ -259,4 +267,107 @@ class ConduceRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun deleteConduceWithAudit(
+        conduce: Conduce,
+        userProfile: UserProfile,
+        reason: String
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val conduceDocRef = conducesRef(uid).document(conduce.id)
+        val auditLogId = UUID.randomUUID().toString()
+        val auditDocRef = deletionLogsRef(uid).document(auditLogId)
+
+        val itemsList = conduce.getParsedItems()
+        val itemsSummary = itemsList.take(5).joinToString(", ") { "${it.quantity} ${it.unit} ${it.description}" }
+
+        val auditPayload = mutableMapOf<String, Any>(
+            "userId" to uid,
+            "conduceId" to conduce.id,
+            "conduceNumber" to conduce.conduceNumber,
+            "originProject" to conduce.originProject,
+            "destinationProject" to conduce.destinationProject,
+            "carrierName" to conduce.carrierName,
+            "itemsSummary" to itemsSummary,
+            "totalItems" to itemsList.size,
+            "deletedByUid" to uid,
+            "deletedByName" to (userProfile.displayName.ifBlank { userProfile.username.ifBlank { "Usuario" } }),
+            "deletedByEmail" to userProfile.email,
+            "deletedByRole" to userProfile.role,
+            "securityLevel" to userProfile.securityLevel,
+            "deletionReason" to reason.trim(),
+            "pdfDeleted" to true,
+            "deletedAt" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            auditDocRef.set(auditPayload).await()
+            conduceDocRef.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, conduceDocRef.path)
+            Result.failure(e)
+        }
+    }
+
+    fun observeDeletionLogs(): Flow<List<DeletionAuditLog>> = callbackFlow {
+        val uid = requireUserId()
+        val path = "users/$uid/deletion_logs"
+        val registration = deletionLogsRef(uid)
+            .orderBy("deletedAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, path)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val items = snapshot?.toObjects(DeletionAuditLog::class.java) ?: emptyList()
+                trySend(items)
+            }
+        awaitClose { registration.remove() }
+    }
+
+    fun observeUserProfile(): Flow<UserProfile?> = callbackFlow {
+        val uid = requireUserId()
+        val path = "users/$uid/profile/info"
+        val registration = profileRef(uid).document("info")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.GET, path)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val profile = snapshot?.toObject(UserProfile::class.java)
+                trySend(profile)
+            }
+        awaitClose { registration.remove() }
+    }
+
+    suspend fun saveUserProfile(profile: UserProfile): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = profileRef(uid).document("info")
+        return try {
+            val payload = mutableMapOf<String, Any>(
+                "userId" to uid,
+                "uid" to uid,
+                "username" to profile.username,
+                "displayName" to profile.displayName,
+                "email" to profile.email,
+                "role" to profile.role,
+                "securityLevel" to profile.securityLevel,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            if (profile.createdAt != null) {
+                payload["createdAt"] = profile.createdAt
+            } else {
+                payload["createdAt"] = FieldValue.serverTimestamp()
+            }
+            docRef.set(payload).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, docRef.path)
+            Result.failure(e)
+        }
+    }
 }
+

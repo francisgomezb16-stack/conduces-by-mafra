@@ -136,6 +136,35 @@ service cloud.firestore {
                          request.auth.uid == userId &&
                          isValidId(projectId);
       }
+
+      match /deletion_logs/{logId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        // Audit records can only be created, never modified or deleted (immutable audit trail)
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(logId) &&
+                         incoming().userId == userId &&
+                         incoming().conduceNumber is string &&
+                         incoming().deletionReason is string &&
+                         incoming().deletionReason.size() >= 1 &&
+                         incoming().deletedAt is timestamp &&
+                         incoming().deletedAt <= request.time;
+
+        allow update, delete: if false;
+      }
+
+      match /profile/{profileId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create, update: if isSignedIn() &&
+                                 request.auth.uid == userId &&
+                                 isValidId(profileId) &&
+                                 incoming().userId == userId;
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
   }
 }
+

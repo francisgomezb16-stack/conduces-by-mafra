@@ -105,3 +105,41 @@ data class Project(
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
+
+@IgnoreExtraProperties
+data class UserProfile(
+    @DocumentId val id: String = "info",
+    val uid: String = "",
+    val username: String = "",
+    val displayName: String = "",
+    val email: String = "",
+    val role: String = "Administrador", // Administrador, Supervisor / Ing. Residente, Operador / Despachador
+    val securityLevel: Int = 1, // 1 = Admin, 2 = Supervisor, 3 = Operador
+    val userId: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+) {
+    fun canDeleteConduce(): Boolean = securityLevel <= 2
+}
+
+@IgnoreExtraProperties
+data class DeletionAuditLog(
+    @DocumentId val id: String = "",
+    val conduceId: String = "",
+    val conduceNumber: String = "",
+    val originProject: String = "",
+    val destinationProject: String = "",
+    val carrierName: String = "",
+    val itemsSummary: String = "",
+    val totalItems: Int = 0,
+    val deletedByUid: String = "",
+    val deletedByName: String = "",
+    val deletedByEmail: String = "",
+    val deletedByRole: String = "Administrador",
+    val securityLevel: Int = 1,
+    val deletionReason: String = "",
+    val pdfDeleted: Boolean = true,
+    val userId: String = "",
+    @ServerTimestamp val deletedAt: Timestamp? = null
+)
+
