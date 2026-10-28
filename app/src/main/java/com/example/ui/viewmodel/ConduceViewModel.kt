@@ -47,6 +47,14 @@ class ConduceViewModel(
             initialValue = CompanyProfile()
         )
 
+    val projectsState: StateFlow<List<com.example.data.model.Project>> = repository.observeProjects()
+        .catch { emit(emptyList()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = emptyList()
+        )
+
     private val _currentConduce = MutableStateFlow<Conduce?>(null)
     val currentConduce: StateFlow<Conduce?> = _currentConduce.asStateFlow()
 
@@ -112,6 +120,30 @@ class ConduceViewModel(
                 _userMessage.value = "Datos de empresa actualizados."
             }.onFailure { e ->
                 _userMessage.value = "Error al guardar empresa: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun saveProject(project: com.example.data.model.Project, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.saveProject(project)
+            result.onSuccess {
+                _userMessage.value = "Obra / Proyecto '${project.name}' guardado correctamente."
+                onDone()
+            }.onFailure { e ->
+                _userMessage.value = "Error al guardar proyecto: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun deleteProject(projectId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.deleteProject(projectId)
+            result.onSuccess {
+                _userMessage.value = "Obra / Proyecto eliminada."
+                onDone()
+            }.onFailure { e ->
+                _userMessage.value = "Error al eliminar proyecto: ${e.localizedMessage}"
             }
         }
     }

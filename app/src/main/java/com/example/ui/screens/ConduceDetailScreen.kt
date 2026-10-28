@@ -491,38 +491,27 @@ fun ConduceDetailScreen(
                         Icon(
                             imageVector = Icons.Default.LocalShipping,
                             contentDescription = null,
-                            tint = Color(0xFFF59E0B),
+                            tint = Color.Black,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Transporte y Conductor",
+                            text = "Datos del Chofer",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF0F172A)
+                            color = Color.Black
                         )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    val carrier = currentConduce.carrierName.ifBlank { "Chofer propio" }
-                    val idDoc = if (currentConduce.carrierIdNumber.isNotBlank()) " • Cédula/ID: ${currentConduce.carrierIdNumber}" else ""
+                    val carrier = currentConduce.carrierName.ifBlank { "Chofer propio / asignado" }
                     Text(
-                        text = "Chofer: $carrier$idDoc",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    val vehInfo = listOfNotNull(
-                        currentConduce.vehicleDescription.takeIf { it.isNotBlank() },
-                        currentConduce.vehiclePlate.takeIf { it.isNotBlank() }?.let { "Placa: $it" },
-                        currentConduce.carrierPhone.takeIf { it.isNotBlank() }?.let { "Tel: $it" }
-                    ).joinToString(" • ")
-
-                    if (vehInfo.isNotBlank()) {
-                        Text(
-                            text = vehInfo,
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF64748B))
+                        text = "Chofer: $carrier",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color.Black,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    }
+                    )
                 }
             }
 

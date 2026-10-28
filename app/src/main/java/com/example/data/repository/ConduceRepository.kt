@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.R
 import com.example.data.model.CompanyProfile
 import com.example.data.model.Conduce
+import com.example.data.model.Project
 import com.example.data.util.OperationType
 import com.example.data.util.handleFirestoreError
 import com.google.firebase.Firebase
@@ -39,6 +40,9 @@ class ConduceRepository(
 
     private fun settingsRef(userId: String) =
         db.collection("users").document(userId).collection("settings")
+
+    private fun projectsRef(userId: String) =
+        db.collection("users").document(userId).collection("projects")
 
     fun observeConduces(): Flow<List<Conduce>> = callbackFlow {
         val uid = requireUserId()
@@ -167,6 +171,9 @@ class ConduceRepository(
         val uid = requireUserId()
         val docRef = settingsRef(uid).document("company")
         return try {
+            val existingDoc = try { docRef.get().await() } catch (e: Exception) { null }
+            val existingCreatedAt = existingDoc?.getTimestamp("createdAt") ?: profile.createdAt
+
             val payload = mutableMapOf<String, Any>(
                 "userId" to uid,
                 "companyName" to profile.companyName
@@ -177,18 +184,78 @@ class ConduceRepository(
             if (profile.address.isNotBlank()) payload["address"] = profile.address
             if (profile.logoBase64.isNotBlank()) payload["logoBase64"] = profile.logoBase64
 
-            val isNew = profile.createdAt == null
-            if (isNew) {
-                payload["createdAt"] = FieldValue.serverTimestamp()
+            if (existingCreatedAt != null) {
+                payload["createdAt"] = existingCreatedAt
                 payload["updatedAt"] = FieldValue.serverTimestamp()
             } else {
-                payload["createdAt"] = profile.createdAt!!
+                payload["createdAt"] = FieldValue.serverTimestamp()
                 payload["updatedAt"] = FieldValue.serverTimestamp()
             }
             docRef.set(payload).await()
             Result.success(Unit)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.WRITE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    fun observeProjects(): Flow<List<Project>> = callbackFlow {
+        val uid = requireUserId()
+        val path = "users/$uid/projects"
+        val registration = projectsRef(uid)
+            .orderBy("name", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, path)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val items = snapshot?.toObjects(Project::class.java) ?: emptyList()
+                trySend(items)
+            }
+        awaitClose { registration.remove() }
+    }
+
+    suspend fun saveProject(project: Project): Result<String> {
+        val uid = requireUserId()
+        val docId = if (project.id.isNotBlank()) project.id else UUID.randomUUID().toString()
+        val docRef = projectsRef(uid).document(docId)
+        val existingDoc = try { docRef.get().await() } catch (e: Exception) { null }
+        val existingCreatedAt = existingDoc?.getTimestamp("createdAt") ?: project.createdAt
+
+        return try {
+            val payload = mutableMapOf<String, Any>(
+                "userId" to uid,
+                "name" to project.name.trim()
+            )
+            if (project.location.isNotBlank()) payload["location"] = project.location.trim()
+            if (project.defaultResponsible.isNotBlank()) payload["defaultResponsible"] = project.defaultResponsible.trim()
+            if (project.phone.isNotBlank()) payload["phone"] = project.phone.trim()
+            if (project.thumbnailBase64.isNotBlank()) payload["thumbnailBase64"] = project.thumbnailBase64
+
+            if (existingCreatedAt != null) {
+                payload["createdAt"] = existingCreatedAt
+                payload["updatedAt"] = FieldValue.serverTimestamp()
+            } else {
+                payload["createdAt"] = FieldValue.serverTimestamp()
+                payload["updatedAt"] = FieldValue.serverTimestamp()
+            }
+            docRef.set(payload).await()
+            Result.success(docId)
+        } catch (e: Exception) {
+            handleFirestoreError(e, if (existingCreatedAt == null) OperationType.CREATE else OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteProject(projectId: String): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = projectsRef(uid).document(projectId)
+        return try {
+            docRef.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, docRef.path)
             Result.failure(e)
         }
     }

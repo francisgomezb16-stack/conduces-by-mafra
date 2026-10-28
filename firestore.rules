@@ -62,6 +62,17 @@ service cloud.firestore {
              (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
     }
 
+    function isValidProject(data) {
+      return data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 150 &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
+             (!('defaultResponsible' in data) || (data.defaultResponsible is string && data.defaultResponsible.size() <= 100)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('thumbnailBase64' in data) || (data.thumbnailBase64 is string && data.thumbnailBase64.size() <= 300000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
     match /users/{userId} {
       match /conduces/{conduceId} {
         allow get, list: if isSignedIn() && request.auth.uid == userId;
@@ -103,6 +114,27 @@ service cloud.firestore {
         allow delete: if isSignedIn() &&
                          request.auth.uid == userId &&
                          isValidId(settingId);
+      }
+
+      match /projects/{projectId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(projectId) &&
+                         incoming().userId == userId &&
+                         isValidProject(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(projectId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidProject(incoming());
+
+        allow delete: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isValidId(projectId);
       }
     }
   }

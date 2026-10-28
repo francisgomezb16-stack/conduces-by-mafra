@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -27,8 +30,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +49,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -73,6 +77,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.Conduce
 import com.example.data.model.ConduceItem
+import com.example.data.model.Project
 import com.example.ui.components.SignatureDialog
 import com.example.ui.viewmodel.ConduceViewModel
 import com.example.util.PdfGenerator
@@ -89,6 +94,7 @@ fun ConduceCreateEditScreen(
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val projects by viewModel.projectsState.collectAsStateWithLifecycle()
 
     val initialNumber = remember {
         existingConduce?.conduceNumber ?: "CND-2026-${(1000..9999).random()}"
@@ -104,11 +110,8 @@ fun ConduceCreateEditScreen(
     var destinationProject by remember { mutableStateOf(existingConduce?.destinationProject ?: "") }
     var destinationResponsible by remember { mutableStateOf(existingConduce?.destinationResponsible ?: "") }
 
+    // Chofer: SOLO pedir el nombre del chofer
     var carrierName by remember { mutableStateOf(existingConduce?.carrierName ?: "") }
-    var carrierIdNumber by remember { mutableStateOf(existingConduce?.carrierIdNumber ?: "") }
-    var carrierPhone by remember { mutableStateOf(existingConduce?.carrierPhone ?: "") }
-    var vehiclePlate by remember { mutableStateOf(existingConduce?.vehiclePlate ?: "") }
-    var vehicleDescription by remember { mutableStateOf(existingConduce?.vehicleDescription ?: "") }
 
     var dispatcherName by remember { mutableStateOf(existingConduce?.dispatcherName ?: "") }
     var dispatcherSignature by remember { mutableStateOf(existingConduce?.dispatcherSignature ?: "") }
@@ -183,7 +186,7 @@ fun ConduceCreateEditScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
             )
         }
     ) { innerPadding ->
@@ -206,7 +209,7 @@ fun ConduceCreateEditScreen(
                     Text(
                         text = "Información General",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0F172A)
+                        color = Color.Black
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -214,8 +217,14 @@ fun ConduceCreateEditScreen(
                     OutlinedTextField(
                         value = conduceNumber,
                         onValueChange = { conduceNumber = it },
-                        label = { Text("Número de Folio *") },
+                        label = { Text("Número de Folio *", color = Color.Black) },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("conduce_number_input")
@@ -226,7 +235,7 @@ fun ConduceCreateEditScreen(
                     Text(
                         text = "Tipo de Conduce",
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF475569)
+                        color = Color.Black
                     )
                     Row(
                         modifier = Modifier
@@ -238,9 +247,9 @@ fun ConduceCreateEditScreen(
                             FilterChip(
                                 selected = selectedType == typeOption,
                                 onClick = { selectedType = typeOption },
-                                label = { Text(typeOption) },
+                                label = { Text(typeOption, color = if (selectedType == typeOption) Color.White else Color.Black) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFF0F172A),
+                                    selectedContainerColor = Color.Black,
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -251,7 +260,7 @@ fun ConduceCreateEditScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Projects Card (Origen & Destino)
+            // Projects Card (Origen & Destino with Autocomplete and Miniatures)
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -262,20 +271,22 @@ fun ConduceCreateEditScreen(
                     Text(
                         text = "Ubicaciones y Responsables",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0F172A)
+                        color = Color.Black
+                    )
+                    Text(
+                        text = "Selecciona de las obras configuradas o escribe con autocompletar",
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color.Black),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = originProject,
-                        onValueChange = { originProject = it },
-                        label = { Text("Obra / Proyecto de Origen *") },
-                        placeholder = { Text("Ej. Torre Bella Vista, Almacén Central") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("origin_project_input")
+                    // Origin Project Autocomplete Field
+                    ProjectAutocompleteField(
+                        label = "Obra / Proyecto de Origen *",
+                        testTag = "origin_project_input",
+                        selectedName = originProject,
+                        onNameChange = { originProject = it },
+                        onResponsibleAutoFill = { if (originResponsible.isBlank()) originResponsible = it },
+                        projects = projects
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -283,25 +294,30 @@ fun ConduceCreateEditScreen(
                     OutlinedTextField(
                         value = originResponsible,
                         onValueChange = { originResponsible = it },
-                        label = { Text("Responsable en Origen") },
+                        label = { Text("Responsable en Origen", color = Color.Black) },
                         placeholder = { Text("Ej. Ing. Carlos Gómez") },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
-                    Divider(color = Color(0xFFE2E8F0))
+                    Divider(color = Color(0xFFCBD5E1))
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    OutlinedTextField(
-                        value = destinationProject,
-                        onValueChange = { destinationProject = it },
-                        label = { Text("Obra / Proyecto de Destino *") },
-                        placeholder = { Text("Ej. Residencial Las Palmas, Obra B") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("destination_project_input")
+                    // Destination Project Autocomplete Field
+                    ProjectAutocompleteField(
+                        label = "Obra / Proyecto de Destino *",
+                        testTag = "destination_project_input",
+                        selectedName = destinationProject,
+                        onNameChange = { destinationProject = it },
+                        onResponsibleAutoFill = { if (destinationResponsible.isBlank()) destinationResponsible = it },
+                        projects = projects
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -309,9 +325,15 @@ fun ConduceCreateEditScreen(
                     OutlinedTextField(
                         value = destinationResponsible,
                         onValueChange = { destinationResponsible = it },
-                        label = { Text("Responsable en Destino") },
+                        label = { Text("Responsable en Destino", color = Color.Black) },
                         placeholder = { Text("Ej. Arq. Laura Martínez") },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -319,7 +341,7 @@ fun ConduceCreateEditScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Transport details Card
+            // Transport details Card (SOLO PEDIR EL NOMBRE DEL CHOFER)
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -327,69 +349,41 @@ fun ConduceCreateEditScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Datos de Transporte",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0F172A)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.LocalShipping,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Datos del Chofer",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = carrierName,
                         onValueChange = { carrierName = it },
-                        label = { Text("Nombre del Chofer / Transportista") },
+                        label = { Text("Nombre del Chofer / Transportista *", color = Color.Black) },
+                        placeholder = { Text("Ej. Juan Pérez") },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("carrier_name_input")
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = carrierIdNumber,
-                            onValueChange = { carrierIdNumber = it },
-                            label = { Text("Cédula / Licencia") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = carrierPhone,
-                            onValueChange = { carrierPhone = it },
-                            label = { Text("Teléfono Chofer") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = vehicleDescription,
-                            onValueChange = { vehicleDescription = it },
-                            label = { Text("Vehículo (Marca/Modelo)") },
-                            placeholder = { Text("Camión Daihatsu") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1.3f)
-                        )
-                        OutlinedTextField(
-                            value = vehiclePlate,
-                            onValueChange = { vehiclePlate = it },
-                            label = { Text("Placa") },
-                            placeholder = { Text("L-123456") },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.9f)
-                        )
-                    }
                 }
             }
 
@@ -411,17 +405,20 @@ fun ConduceCreateEditScreen(
                         Text(
                             text = "Materiales y Herramientas (${itemsList.size})",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF0F172A)
+                            color = Color.Black
                         )
 
                         Button(
                             onClick = { showAddItemDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Black,
+                                contentColor = Color.White
+                            ),
                             modifier = Modifier.testTag("add_item_button")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F172A), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Agregar", color = Color(0xFF0F172A))
+                            Text("Agregar", color = Color.White)
                         }
                     }
 
@@ -430,7 +427,7 @@ fun ConduceCreateEditScreen(
                     if (itemsList.isEmpty()) {
                         Text(
                             text = "No hay materiales ni herramientas en la lista. Toca 'Agregar' para añadir ítems al conduce.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray),
+                            style = MaterialTheme.typography.bodySmall.copy(color = Color.Black),
                             modifier = Modifier.padding(vertical = 12.dp)
                         )
                     } else {
@@ -445,20 +442,23 @@ fun ConduceCreateEditScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = "${index + 1}. ${item.description}",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Black
+                                        )
                                     )
                                     Text(
                                         text = "${item.quantity} ${item.unit} • ${item.category} • Estado: ${item.condition}",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF64748B))
+                                        style = MaterialTheme.typography.bodySmall.copy(color = Color.Black)
                                     )
                                 }
 
                                 IconButton(onClick = { itemsList.removeAt(index) }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFEF4444))
+                                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFDC2626))
                                 }
                             }
                             if (index < itemsList.lastIndex) {
-                                Divider(color = Color(0xFFF1F5F9))
+                                Divider(color = Color(0xFFCBD5E1))
                             }
                         }
                     }
@@ -478,11 +478,11 @@ fun ConduceCreateEditScreen(
                     Text(
                         text = "Firmas Digitales",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0F172A)
+                        color = Color.Black
                     )
                     Text(
                         text = "Captura digital de firmas directamente en la pantalla",
-                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF64748B)),
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color.Black),
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
@@ -490,8 +490,14 @@ fun ConduceCreateEditScreen(
                     OutlinedTextField(
                         value = dispatcherName,
                         onValueChange = { dispatcherName = it },
-                        label = { Text("Nombre de quien Despacha") },
+                        label = { Text("Nombre de quien Despacha", color = Color.Black) },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -503,7 +509,7 @@ fun ConduceCreateEditScreen(
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = Color(0xFFE2E8F0))
+                    Divider(color = Color(0xFFCBD5E1))
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Carrier Signature
@@ -515,15 +521,21 @@ fun ConduceCreateEditScreen(
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = Color(0xFFE2E8F0))
+                    Divider(color = Color(0xFFCBD5E1))
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Receiver Signature
                     OutlinedTextField(
                         value = receiverName,
                         onValueChange = { receiverName = it },
-                        label = { Text("Nombre de quien Recibe en Obra") },
+                        label = { Text("Nombre de quien Recibe en Obra", color = Color.Black) },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -549,7 +561,7 @@ fun ConduceCreateEditScreen(
                     Text(
                         text = "Observaciones Generales",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0F172A)
+                        color = Color.Black
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -558,6 +570,12 @@ fun ConduceCreateEditScreen(
                         onValueChange = { notes = it },
                         placeholder = { Text("Condiciones de entrega, precintos, aseguramiento de carga, etc.") },
                         maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -577,10 +595,6 @@ fun ConduceCreateEditScreen(
                         destinationProject = destinationProject.trim(),
                         destinationResponsible = destinationResponsible.trim(),
                         carrierName = carrierName.trim(),
-                        carrierIdNumber = carrierIdNumber.trim(),
-                        carrierPhone = carrierPhone.trim(),
-                        vehiclePlate = vehiclePlate.trim(),
-                        vehicleDescription = vehicleDescription.trim(),
                         dispatcherName = dispatcherName.trim(),
                         dispatcherSignature = dispatcherSignature,
                         carrierSignature = carrierSignature,
@@ -595,22 +609,243 @@ fun ConduceCreateEditScreen(
                     }
                 },
                 enabled = !isSaving && originProject.isNotBlank() && destinationProject.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
                     .testTag("save_conduce_button")
             ) {
                 if (isSaving) {
-                    CircularProgressIndicator(color = Color(0xFFF59E0B), modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFF59E0B))
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Guardar y Sincronizar en la Nube", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                 }
             }
 
             Spacer(modifier = Modifier.height(30.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProjectAutocompleteField(
+    label: String,
+    testTag: String,
+    selectedName: String,
+    onNameChange: (String) -> Unit,
+    onResponsibleAutoFill: (String) -> Unit,
+    projects: List<Project>
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val filteredProjects = remember(selectedName, projects) {
+        if (selectedName.isBlank()) {
+            projects
+        } else {
+            projects.filter {
+                it.name.contains(selectedName, ignoreCase = true) ||
+                it.location.contains(selectedName, ignoreCase = true)
+            }
+        }
+    }
+
+    Column {
+        // Quick thumbnail chips carousel if projects exist
+        if (projects.isNotEmpty()) {
+            Text(
+                text = "Seleccionar de catálogo:",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 11.sp,
+                    color = Color.Black,
+                    fontWeight = FontWeight.Medium
+                ),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            ) {
+                items(projects) { project ->
+                    val isSelected = selectedName.equals(project.name, ignoreCase = true)
+                    val thumbnailBitmap = remember(project.thumbnailBase64) {
+                        if (project.thumbnailBase64.isNotBlank()) {
+                            PdfGenerator.decodeBase64Bitmap(project.thumbnailBase64)
+                        } else null
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) Color.Black else Color(0xFFF1F5F9),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) Color.Black else Color(0xFFCBD5E1)
+                        ),
+                        modifier = Modifier.clickable {
+                            onNameChange(project.name)
+                            if (project.defaultResponsible.isNotBlank()) {
+                                onResponsibleAutoFill(project.defaultResponsible)
+                            }
+                        }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE2E8F0)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (thumbnailBitmap != null) {
+                                    Image(
+                                        bitmap = thumbnailBitmap.asImageBitmap(),
+                                        contentDescription = project.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.LocationCity,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else Color.Black,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = project.name,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else Color.Black,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Searchable Autocomplete Field with Dropdown
+        ExposedDropdownMenuBox(
+            expanded = expanded && filteredProjects.isNotEmpty(),
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = selectedName,
+                onValueChange = {
+                    onNameChange(it)
+                    expanded = true
+                },
+                label = { Text(label, color = Color.Black) },
+                placeholder = { Text("Escribe o selecciona...", color = Color(0xFF64748B)) },
+                trailingIcon = {
+                    if (projects.isNotEmpty()) {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedBorderColor = Color.Black,
+                    unfocusedBorderColor = Color(0xFF64748B)
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+                    .testTag(testTag)
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded && filteredProjects.isNotEmpty(),
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color.White)
+            ) {
+                filteredProjects.forEach { project ->
+                    val thumbnailBitmap = remember(project.thumbnailBase64) {
+                        if (project.thumbnailBase64.isNotBlank()) {
+                            PdfGenerator.decodeBase64Bitmap(project.thumbnailBase64)
+                        } else null
+                    }
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFE2E8F0)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (thumbnailBitmap != null) {
+                                        Image(
+                                            bitmap = thumbnailBitmap.asImageBitmap(),
+                                            contentDescription = project.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.LocationCity,
+                                            contentDescription = null,
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column {
+                                    Text(
+                                        text = project.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Black
+                                        )
+                                    )
+                                    val subtitle = listOfNotNull(
+                                        project.location.takeIf { it.isNotBlank() },
+                                        project.defaultResponsible.takeIf { it.isNotBlank() }?.let { "Resp: $it" }
+                                    ).joinToString(" • ")
+                                    if (subtitle.isNotBlank()) {
+                                        Text(
+                                            text = subtitle,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = Color.Black,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        onClick = {
+                            onNameChange(project.name)
+                            if (project.defaultResponsible.isNotBlank()) {
+                                onResponsibleAutoFill(project.defaultResponsible)
+                            }
+                            expanded = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -645,17 +880,18 @@ private fun SignaturePreviewOrButton(
                 contentScale = ContentScale.Fit
             )
             IconButton(onClick = onClearClick) {
-                Icon(Icons.Default.Close, contentDescription = "Eliminar firma", tint = Color(0xFF64748B))
+                Icon(Icons.Default.Close, contentDescription = "Eliminar firma", tint = Color.Black)
             }
         }
     } else {
         OutlinedButton(
             onClick = onSignClick,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Default.Create, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Registrar $label")
+            Text("Registrar $label", color = Color.Black)
         }
     }
 }
@@ -681,7 +917,7 @@ private fun AddItemDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = Color.White,
             tonalElevation = 8.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -692,7 +928,10 @@ private fun AddItemDialog(
             ) {
                 Text(
                     text = "Añadir Material o Herramienta",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -700,9 +939,15 @@ private fun AddItemDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Descripción del Ítem *") },
+                    label = { Text("Descripción del Ítem *", color = Color.Black) },
                     placeholder = { Text("Ej. Cemento Gris, Taladro Percutor 20V") },
                     singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.Black,
+                        unfocusedTextColor = Color.Black,
+                        focusedBorderColor = Color.Black,
+                        unfocusedBorderColor = Color(0xFF64748B)
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("item_description_input")
@@ -719,19 +964,26 @@ private fun AddItemDialog(
                         value = category,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Categoría") },
+                        label = { Text("Categoría", color = Color.Black) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier
                             .menuAnchor()
                             .fillMaxWidth()
                     )
                     ExposedDropdownMenu(
                         expanded = categoryExpanded,
-                        onDismissRequest = { categoryExpanded = false }
+                        onDismissRequest = { categoryExpanded = false },
+                        modifier = Modifier.background(Color.White)
                     ) {
                         listOf("Material", "Herramienta", "Equipo", "Otro").forEach { cat ->
                             DropdownMenuItem(
-                                text = { Text(cat) },
+                                text = { Text(cat, color = Color.Black) },
                                 onClick = {
                                     category = cat
                                     categoryExpanded = false
@@ -750,9 +1002,15 @@ private fun AddItemDialog(
                     OutlinedTextField(
                         value = quantityText,
                         onValueChange = { quantityText = it },
-                        label = { Text("Cantidad *") },
+                        label = { Text("Cantidad *", color = Color.Black) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("item_quantity_input")
@@ -768,17 +1026,24 @@ private fun AddItemDialog(
                             value = unit,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Unidad") },
+                            label = { Text("Unidad", color = Color.Black) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedBorderColor = Color.Black,
+                                unfocusedBorderColor = Color(0xFF64748B)
+                            ),
                             modifier = Modifier.menuAnchor()
                         )
                         ExposedDropdownMenu(
                             expanded = unitExpanded,
-                            onDismissRequest = { unitExpanded = false }
+                            onDismissRequest = { unitExpanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             listOf("Uds", "Sacos", "m³", "kg", "Piezas", "Cajas", "Metros", "Galones").forEach { u ->
                                 DropdownMenuItem(
-                                    text = { Text(u) },
+                                    text = { Text(u, color = Color.Black) },
                                     onClick = {
                                         unit = u
                                         unitExpanded = false
@@ -798,9 +1063,15 @@ private fun AddItemDialog(
                     OutlinedTextField(
                         value = serialOrCode,
                         onValueChange = { serialOrCode = it },
-                        label = { Text("Serie / Referencia") },
+                        label = { Text("Serie / Referencia", color = Color.Black) },
                         placeholder = { Text("SN-9843") },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = Color.Black,
+                            unfocusedBorderColor = Color(0xFF64748B)
+                        ),
                         modifier = Modifier.weight(1.2f)
                     )
 
@@ -814,17 +1085,24 @@ private fun AddItemDialog(
                             value = condition,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Estado") },
+                            label = { Text("Estado", color = Color.Black) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = conditionExpanded) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black,
+                                focusedBorderColor = Color.Black,
+                                unfocusedBorderColor = Color(0xFF64748B)
+                            ),
                             modifier = Modifier.menuAnchor()
                         )
                         ExposedDropdownMenu(
                             expanded = conditionExpanded,
-                            onDismissRequest = { conditionExpanded = false }
+                            onDismissRequest = { conditionExpanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             listOf("Nuevo", "Bueno", "Usado", "Regular").forEach { cond ->
                                 DropdownMenuItem(
-                                    text = { Text(cond) },
+                                    text = { Text(cond, color = Color.Black) },
                                     onClick = {
                                         condition = cond
                                         conditionExpanded = false
@@ -840,9 +1118,10 @@ private fun AddItemDialog(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = onDismiss,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Cancelar")
+                        Text("Cancelar", color = Color.Black)
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -866,12 +1145,15 @@ private fun AddItemDialog(
                             }
                         },
                         enabled = description.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("confirm_add_item_button")
                     ) {
-                        Text("Añadir")
+                        Text("Añadir", fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -92,6 +92,7 @@ fun ConduceListScreen(
 
     val conducesUiState by viewModel.conducesState.collectAsStateWithLifecycle()
     val companyProfile by viewModel.companyProfileState.collectAsStateWithLifecycle()
+    val projects by viewModel.projectsState.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -108,10 +109,16 @@ fun ConduceListScreen(
     if (showCompanyDialog) {
         CompanySettingsDialog(
             initialProfile = companyProfile ?: CompanyProfile(),
+            projects = projects,
             onDismiss = { showCompanyDialog = false },
-            onSave = { updatedProfile ->
+            onSaveProfile = { updatedProfile ->
                 viewModel.saveCompanyProfile(updatedProfile)
-                showCompanyDialog = false
+            },
+            onSaveProject = { newProject ->
+                viewModel.saveProject(newProject)
+            },
+            onDeleteProject = { projectId ->
+                viewModel.deleteProject(projectId)
             }
         )
     }

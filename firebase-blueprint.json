@@ -163,6 +163,52 @@
         "userId",
         "createdAt"
       ]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Catálogo de proyectos y obras configurados por el usuario para selección y autocompletado con miniatura",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre de la obra o proyecto (ej. Torre Bella Vista)"
+        },
+        "location": {
+          "type": "string",
+          "description": "Ubicación o dirección de la obra"
+        },
+        "defaultResponsible": {
+          "type": "string",
+          "description": "Ingeniero o responsable predeterminado en la obra"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Teléfono de contacto de la obra"
+        },
+        "thumbnailBase64": {
+          "type": "string",
+          "description": "Fotografía o miniatura de la obra en Base64"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID del usuario propietario"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de registro. Clients submit FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de actualización. Clients submit FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "name",
+        "userId",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -173,6 +219,10 @@
     "/users/{userId}/settings/{settingId}": {
       "schema": "CompanyProfile",
       "description": "Configuraciones y datos de la empresa del usuario para membretes y PDFs"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Catálogo de obras y proyectos del usuario con miniaturas y responsables"
     }
   }
 }

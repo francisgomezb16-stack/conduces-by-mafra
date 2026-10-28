@@ -82,12 +82,25 @@ data class Conduce(
 @IgnoreExtraProperties
 data class CompanyProfile(
     @DocumentId val id: String = "company",
-    val companyName: String = "Constructora & Logística Pro",
+    val companyName: String = "Pedralbes",
     val taxId: String = "",
     val phone: String = "",
     val email: String = "",
     val address: String = "",
     val logoBase64: String = "",
+    val userId: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+
+@IgnoreExtraProperties
+data class Project(
+    @DocumentId val id: String = "",
+    val name: String = "",
+    val location: String = "",
+    val defaultResponsible: String = "",
+    val phone: String = "",
+    val thumbnailBase64: String = "",
     val userId: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null

@@ -103,8 +103,22 @@ test("Alice: can read and update her own company profile in settings", async () 
       createdAt: new Date(),
     })
   );
+});
 
+test("Alice: can create and read projects in her catalog", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   await assertSucceeds(
-    aliceDb.collection("users").doc(ALICE_UID).collection("settings").doc("company").get()
+    aliceDb.collection("users").doc(ALICE_UID).collection("projects").doc("proj_01").set({
+      name: "Torre Pedralbes",
+      location: "Av. Winston Churchill #105",
+      defaultResponsible: "Ing. Manuel Sánchez",
+      userId: ALICE_UID,
+      createdAt: new Date(),
+    })
+  );
+
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  await assertFails(
+    bobDb.collection("users").doc(ALICE_UID).collection("projects").doc("proj_01").get()
   );
 });
